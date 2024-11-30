@@ -8,13 +8,15 @@ import com.bank.common.exception.BusinessException;
 import com.bank.loan.management.api.entity.Customer;
 import com.bank.loan.management.api.entity.Loan;
 import com.bank.loan.management.api.entity.LoanInstallment;
+import com.bank.loan.management.api.mapper.LoanInstallmentMapper;
+import com.bank.loan.management.api.mapper.LoanMapper;
 import com.bank.loan.management.api.mapper.PossibleLoanMapper;
+import com.bank.loan.management.api.model.LoanDTO;
 import com.bank.loan.management.api.model.PossibleLoanDTO;
 import com.bank.loan.management.api.repository.CustomerRepository;
 import com.bank.loan.management.api.repository.LoanRepository;
 import com.bank.loan.management.api.request.CreateLoanRequest;
 import com.bank.loan.management.api.request.PayLoanRequest;
-import com.bank.loan.management.api.response.CreateLoanResponse;
 import com.bank.loan.management.api.response.PayLoanResponse;
 import com.bank.loan.management.api.rule_engine.LoanLimitRule;
 import com.bank.loan.management.api.rule_engine.RuleEngine;
@@ -37,23 +39,26 @@ public class LoanCommandServiceImpl implements LoanCommandService {
 
   private final CustomerRepository customerRepository;
   private final PossibleLoanMapper possibleLoanMapper;
+  private final LoanInstallmentMapper loanInstallmentMapper;
   private final LoanLimitRule loanLimitRule;
   private final LoanRepository loanRepository;
+  private final LoanMapper loanMapper;
   private final static int maxPayableInstallment = 3;
 
 
   @Transactional
-  public synchronized CreateLoanResponse createLoan(CreateLoanRequest request) {
+  public synchronized LoanDTO createLoan(CreateLoanRequest request) {
     Customer customer = getCustomer(request.getCustomerId());
+    BigDecimal totalAmount = calculateTotalAmount(request);
+
     PossibleLoanDTO possibleLoan = possibleLoanMapper.mergeFromRequestAndDatabaseInfo(
-        request, customer);
+        request, customer, totalAmount);
+
     if (RuleEngine.evaluate(possibleLoan, loanLimitRule)) {
       throw new BusinessException(LOAN_LIMIT_NOT_ENOUGH);
     }
-    BigDecimal totalAmount = calculateTotalAmount(possibleLoan);
 
     BigDecimal installmentAmount = calculateInstallmentAmount(request, totalAmount);
-    //First Installment
     List<LoanInstallment> installments = new ArrayList<>();
 
     LocalDate theFirstDayOfNextMonth = LocalDate.now();
@@ -66,18 +71,18 @@ public class LoanCommandServiceImpl implements LoanCommandService {
     Loan saved = loanRepository.save(loan);
     customer.setUsedCreditLimit(customer.getUsedCreditLimit().add(totalAmount));
     customerRepository.save(customer);
-    return new CreateLoanResponse(saved.getId());
+    return loanMapper.map(saved);
   }
 
 
   @Override
   @Transactional
-  public PayLoanResponse pay(PayLoanRequest request) {
+  public synchronized PayLoanResponse pay(PayLoanRequest request) {
     Customer customer = getCustomer(request.getCustomerId());
     Loan loan = getLoan(request, customer);
     List<LoanInstallment> installments = getSortedInstallment(loan);
     BigDecimal amount = request.getAmount();
-
+    List<LoanInstallment> paidInstallments = new ArrayList<>();
     if (installments.get(0).getAmount().compareTo(amount) > 0) {
       throw new BusinessException(AMOUNT_NOT_ENOUGH);
     }
@@ -89,12 +94,14 @@ public class LoanCommandServiceImpl implements LoanCommandService {
       if (numberOfPaidInstallments == maxPayableInstallment) {
         break;
       }
-      if (amount.subtract(installment.getAmount()).compareTo(BigDecimal.ZERO) > 0) {
+      if (amount.subtract(installment.getAmount()).compareTo(BigDecimal.ZERO) >= 0) {
         installment.setPaymentDate(LocalDate.now());
         installment.setPaidAmount(installment.getAmount());
         installment.setPaid(true);
         amount = amount.subtract(installment.getAmount());
-        BigDecimal usedCreditLimit = customer.getUsedCreditLimit().subtract(installment.getAmount());
+        paidInstallments.add(installment);
+        BigDecimal usedCreditLimit = customer.getUsedCreditLimit()
+            .subtract(installment.getAmount());
         if (usedCreditLimit.compareTo(BigDecimal.ZERO) > 0) {
           customer.setUsedCreditLimit(usedCreditLimit);
         } else {
@@ -112,7 +119,8 @@ public class LoanCommandServiceImpl implements LoanCommandService {
     loan.setLoanInstallments(installments);
     loanRepository.save(loan);
     customerRepository.save(customer);
-    return new PayLoanResponse();
+    return new PayLoanResponse(numberOfPaidInstallments,
+        loanInstallmentMapper.map(paidInstallments), loan.getPaid());
   }
 
   private List<LoanInstallment> getSortedInstallment(Loan loan) {
@@ -153,8 +161,8 @@ public class LoanCommandServiceImpl implements LoanCommandService {
     return loan;
   }
 
-  private BigDecimal calculateTotalAmount(PossibleLoanDTO possibleLoan) {
-    return possibleLoan.getAmount().multiply(BigDecimal.ONE.add(possibleLoan.getInterestRate()));
+  private BigDecimal calculateTotalAmount(CreateLoanRequest request) {
+    return request.getAmount().multiply(BigDecimal.ONE.add(request.getInterestRate()));
   }
 
   private LoanInstallment populateInstallment(BigDecimal installmentAmount, LocalDate dueDate) {

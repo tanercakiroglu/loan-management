@@ -11,7 +11,7 @@ public class LoanLimitRule implements Rule<PossibleLoanDTO> {
   public boolean evaluate(PossibleLoanDTO possibleLoanDTO) {
     return possibleLoanDTO.getCreditLimit()
         .subtract(possibleLoanDTO.getUsedCreditLimit())
-        .subtract(possibleLoanDTO.getAmount()).compareTo(BigDecimal.ZERO) <= 0;
+        .subtract(possibleLoanDTO.getAmount()).compareTo(BigDecimal.ZERO) < 0;
   }
 
 }

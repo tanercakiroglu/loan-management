@@ -1,9 +1,9 @@
 package com.bank.loan.management.api.controller;
 
 import com.bank.common.response.WrapperResponse;
+import com.bank.loan.management.api.model.LoanDTO;
 import com.bank.loan.management.api.request.CreateLoanRequest;
 import com.bank.loan.management.api.request.PayLoanRequest;
-import com.bank.loan.management.api.response.CreateLoanResponse;
 import com.bank.loan.management.api.response.PayLoanResponse;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -16,7 +16,7 @@ public interface LoanCommandController {
 
   @PostMapping()
   @PreAuthorize("@securityServiceImpl.hasUserOrAdmin(#request.customerId)")
-  WrapperResponse<CreateLoanResponse> createLoan(@Valid @RequestBody CreateLoanRequest request);
+  WrapperResponse<LoanDTO> createLoan(@Valid @RequestBody CreateLoanRequest request);
 
   @PostMapping("/pay")
   @PreAuthorize("@securityServiceImpl.hasUserOrAdmin(#request.customerId)")
