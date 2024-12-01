@@ -37,3 +37,7 @@ http://localhost:8081/bank/loan-management/v1/h2/
 jdbc url : jdbc:h2:mem:db
 username: sa
 password: sa
+
+The project consist of 2 parts , config and api.While config part contains all 
+infrastructures(exception handler, internationalization,aspects, core validators),
+Api part handle http request and business part.
