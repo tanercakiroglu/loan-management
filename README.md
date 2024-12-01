@@ -27,6 +27,8 @@ There is no specific instruction to run the project , it is enough to click run 
 Usage:
 After run the project you can find the collection to trigger the endpoints
 Loan-Management.postman_collection.json
+You can find the other credentials inside 
+src/main/java/com/bank/loan/management/api/security/BasicAuthConfig.java
 
 
 Additional Notes:
