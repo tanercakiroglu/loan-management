@@ -27,6 +27,7 @@ import jakarta.transaction.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -96,7 +97,7 @@ public class LoanCommandServiceImpl implements LoanCommandService {
       }
       if (amount.subtract(installment.getAmount()).compareTo(BigDecimal.ZERO) >= 0) {
         installment.setPaymentDate(LocalDate.now());
-        installment.setPaidAmount(installment.getAmount());
+        installment.setPaidAmount(processPenaltyOrReward(installment));
         installment.setPaid(true);
         amount = amount.subtract(installment.getAmount());
         paidInstallments.add(installment);
@@ -171,5 +172,23 @@ public class LoanCommandServiceImpl implements LoanCommandService {
     installment.setDueDate(dueDate);
     installment.setPaid(false);
     return installment;
+  }
+
+  private BigDecimal processPenaltyOrReward(LoanInstallment installment) {
+    LocalDate dueDate = installment.getDueDate();
+    long daysDifference = ChronoUnit.DAYS.between(dueDate, LocalDate.now());
+    BigDecimal constant = new BigDecimal("0.001");
+    BigDecimal adjustedAmount = installment.getAmount();
+
+    if (daysDifference < 0) {
+      // Payment before due date, apply discount
+      adjustedAmount = adjustedAmount.subtract(installment.getAmount()
+          .multiply(constant.multiply(new BigDecimal(Math.abs(daysDifference)))));
+    } else if (daysDifference > 0) {
+      // Payment after due date, apply penalty
+      adjustedAmount = adjustedAmount.add(
+          installment.getAmount().multiply(constant).multiply(new BigDecimal(daysDifference)));
+    }
+    return adjustedAmount;
   }
 }

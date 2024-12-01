@@ -18,7 +18,7 @@ public class PayLoanResponse {
       Boolean loanPaid) {
     this.numberOfPaidInstallments = numberOfPaidInstallments;
     this.paidInstallments = paidInstallments;
-    this.totalAmount = paidInstallments.stream().map(LoanInstallmentDTO::getAmount)
+    this.totalAmount = paidInstallments.stream().map(LoanInstallmentDTO::getPaidAmount)
         .reduce(BigDecimal.ZERO, BigDecimal::add);
     this.loanPaid =loanPaid;
   }
