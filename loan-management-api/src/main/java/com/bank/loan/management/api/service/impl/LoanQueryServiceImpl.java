@@ -20,6 +20,7 @@ public class LoanQueryServiceImpl implements LoanQueryService {
   private final LoanMapper loanMapper;
   private final LoanInstallmentMapper loanInstallmentMapper;
 
+  @Transactional
   @Override
   public List<LoanDTO> getLoansByCustomer(Long customerId) {
     return loanMapper.map(loanRepository.findByCustomerId(customerId));
