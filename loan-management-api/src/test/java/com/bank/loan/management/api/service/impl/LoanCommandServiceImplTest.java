@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -31,6 +32,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -157,15 +160,23 @@ class LoanCommandServiceImplTest {
 
   @Test
   void payInstallment_returnOk() {
+
+    LocalDate currentLocalDate = LocalDate.parse("2024-12-01");
+    PayLoanResponse result;
     when(customerRepository.findById(anyLong())).thenReturn(
         Optional.of(getCustomer(new BigDecimal("1000"), new BigDecimal("9000"))));
 
     when(loanRepository.save(any())).thenReturn(getLoan(new BigDecimal("6000")));
-    PayLoanResponse result = loanCommandService.pay(
-        getPayLoanRequest(new BigDecimal("3000"), 1L, 1L));
+
+    try (MockedStatic<LocalDate> guid1 = mockStatic(LocalDate.class, Mockito.CALLS_REAL_METHODS)) {
+      when(LocalDate.now()).thenReturn(currentLocalDate);
+      result = loanCommandService.pay(
+          getPayLoanRequest(new BigDecimal("3000"), 1L, 1L));
+      guid1.reset();
+    }
 
     assertEquals(3, result.getNumberOfPaidInstallments());
-    //assertEquals(new BigDecimal("2363.00").setScale(2), result.getTotalAmount().setScale(2));
+    assertEquals(new BigDecimal("2363.00").setScale(2), result.getTotalAmount().setScale(2));
   }
 
   @Test
